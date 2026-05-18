@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Search, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -14,14 +14,20 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+type BrandRow = {
+  id: string;
+  name: string;
+  slug: string;
+  productCount: number;
+  status: string;
+};
+
 export function BrandsManagement() {
   const [isOpen, setIsOpen] = useState(false);
-  const [brands, setBrands] = useState([
-    { id: "BRD-01", name: "Lumen Exclusives", slug: "lumen-exclusives", productCount: 120, status: "Active" },
-    { id: "BRD-02", name: "Nordic Living", slug: "nordic-living", productCount: 45, status: "Active" },
-    { id: "BRD-03", name: "Artisan Woodworks", slug: "artisan-woodworks", productCount: 12, status: "Active" },
-    { id: "BRD-04", name: "Modern Light", slug: "modern-light", productCount: 38, status: "Active" },
-  ]);
+  const [brands, setBrands] = useState<BrandRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -29,24 +35,64 @@ export function BrandsManagement() {
     status: "Active"
   });
 
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newBrand = {
-      id: `BRD-0${brands.length + 1}`,
-      name: formData.name,
-      slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, "-"),
-      productCount: 0,
-      status: formData.status
-    };
-    setBrands([...brands, newBrand]);
-    setFormData({ name: "", slug: "", status: "Active" });
-    setIsOpen(false);
+  const fetchBrands = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/brands");
+      const data = await res.json();
+      if (res.ok) {
+        setBrands(data);
+      }
+    } catch (err) {
+      console.error("Error fetching brands:", err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchBrands();
+  }, []);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/admin/brands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          slug: formData.slug || null,
+        }),
+      });
+
+      if (response.ok) {
+        await fetchBrands();
+        setFormData({ name: "", slug: "", status: "Active" });
+        setIsOpen(false);
+      }
+    } catch (err) {
+      console.error("Error creating brand:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const filteredBrands = brands.filter((brand) =>
+    brand.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    brand.slug.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-heading text-foreground">Brands</h1>
+        <div>
+          <h1 className="text-3xl font-heading text-foreground">Brands</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage brand labels and manufacture tags in your inventory.</p>
+        </div>
         
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger className="bg-foreground text-background px-4 py-2 text-sm font-medium rounded-md hover:bg-primary transition-colors flex items-center gap-2 cursor-pointer">
@@ -65,7 +111,7 @@ export function BrandsManagement() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required 
-                  className="focus-visible:ring-primary"
+                  className="focus-visible:ring-primary border-border"
                 />
               </div>
               <div className="space-y-2">
@@ -75,20 +121,8 @@ export function BrandsManagement() {
                   placeholder="e.g. nordic-living" 
                   value={formData.slug}
                   onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  className="focus-visible:ring-primary"
+                  className="focus-visible:ring-primary border-border"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <select 
-                  id="status" 
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Draft">Draft</option>
-                </select>
               </div>
               <DialogFooter className="pt-4 gap-2">
                 <button 
@@ -100,8 +134,10 @@ export function BrandsManagement() {
                 </button>
                 <button 
                   type="submit" 
-                  className="px-4 py-2 bg-foreground text-background text-sm font-medium rounded-md hover:bg-primary transition-colors cursor-pointer"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-foreground text-background text-sm font-medium rounded-md hover:bg-primary transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-50"
                 >
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   Save Brand
                 </button>
               </DialogFooter>
@@ -114,49 +150,54 @@ export function BrandsManagement() {
         <div className="p-4 border-b border-border flex justify-between items-center">
           <div className="relative flex-1 sm:w-64 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Search brands..." className="pl-9 h-9 text-sm" />
+            <Input 
+              placeholder="Search brands..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-9 text-sm border-border bg-transparent" 
+            />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
-              <tr>
-                <th className="px-6 py-4 font-medium">Brand Name</th>
-                <th className="px-6 py-4 font-medium">Slug</th>
-                <th className="px-6 py-4 font-medium">Products</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {brands.map(brand => (
-                <tr key={brand.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4 font-medium text-foreground">{brand.name}</td>
-                  <td className="px-6 py-4 text-muted-foreground">{brand.slug}</td>
-                  <td className="px-6 py-4">{brand.productCount}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant="outline" className={`font-normal rounded-md text-xs
-                      ${brand.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-700 border-gray-200'}
-                    `}>
-                      {brand.status}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            <p className="text-sm text-muted-foreground">Loading brands...</p>
+          </div>
+        ) : filteredBrands.length === 0 ? (
+          <div className="text-center py-20 text-muted-foreground">
+            No brands found.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
+                <tr>
+                  <th className="px-6 py-4 font-medium">Brand Name</th>
+                  <th className="px-6 py-4 font-medium">Slug</th>
+                  <th className="px-6 py-4 font-medium">Products</th>
+                  <th className="px-6 py-4 font-medium">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredBrands.map(brand => (
+                  <tr key={brand.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-6 py-4 font-medium text-foreground">{brand.name}</td>
+                    <td className="px-6 py-4 text-muted-foreground">{brand.slug}</td>
+                    <td className="px-6 py-4 text-foreground">{brand.productCount}</td>
+                    <td className="px-6 py-4">
+                      <Badge variant="outline" className={`font-normal rounded-md text-xs
+                        ${brand.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-700 border-gray-200'}
+                      `}>
+                        {brand.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
