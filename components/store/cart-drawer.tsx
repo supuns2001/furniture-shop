@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShoppingBag, X, Minus, Plus, Trash2 } from "lucide-react";
+import { ShoppingBag, Minus, Plus, Trash2, Loader2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -12,33 +12,17 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useCurrency } from "@/components/store/currency-context";
+
+import { useCart } from "@/components/store/cart-context";
 
 export function CartDrawer() {
+  const { formatPrice } = useCurrency();
+  const { cartItems, updateQuantity, removeFromCart, cartTotal, itemCount, isSyncing } = useCart();
   const [isOpen, setIsOpen] = useState(false);
-  
-  // Mock cart data
-  const [cartItems, setCartItems] = useState([
-    {
-      id: "1",
-      name: "Aria Lounge Chair",
-      price: 1250,
-      quantity: 1,
-      image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?q=80&w=800&auto=format&fit=crop",
-      variant: "Cream, Boucle"
-    }
-  ]);
 
-  const updateQuantity = (id: string, newQuantity: number) => {
-    if (newQuantity < 1) return;
-    setCartItems(cartItems.map(item => item.id === id ? { ...item, quantity: newQuantity } : item));
-  };
+  const subtotal = cartTotal;
 
-  const removeItem = (id: string) => {
-    setCartItems(cartItems.filter(item => item.id !== id));
-  };
-
-  const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const itemCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -60,7 +44,13 @@ export function CartDrawer() {
       <SheetContent className="w-full sm:max-w-md border-border bg-background p-0 flex flex-col">
         <SheetHeader className="p-6 border-b border-border">
           <SheetTitle className="font-heading text-2xl flex justify-between items-center">
-            Your Cart ({itemCount})
+            <span>Your Cart ({itemCount})</span>
+            {isSyncing && (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground font-normal">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Saving...
+              </span>
+            )}
           </SheetTitle>
         </SheetHeader>
 
@@ -74,7 +64,7 @@ export function CartDrawer() {
               >
                 <ShoppingBag className="w-12 h-12 text-muted-foreground/30" />
                 <p className="text-lg font-medium">Your cart is empty.</p>
-                <p className="text-muted-foreground">Looks like you haven't added any luxury pieces to your cart yet.</p>
+                <p className="text-muted-foreground">Looks like you haven&apos;t added any luxury pieces to your cart yet.</p>
                 <button 
                   onClick={() => setIsOpen(false)}
                   className="mt-6 border-b border-foreground pb-1 text-sm font-medium uppercase tracking-wider"
@@ -102,27 +92,27 @@ export function CartDrawer() {
                           <h4 className="font-medium text-foreground text-sm">{item.name}</h4>
                           <p className="text-xs text-muted-foreground mt-1">{item.variant}</p>
                         </div>
-                        <button onClick={() => removeItem(item.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                        <button onClick={() => void removeFromCart(item.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                       <div className="flex justify-between items-center mt-4">
                         <div className="flex items-center border border-border">
                           <button 
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            onClick={() => void updateQuantity(item.id, item.quantity - 1)}
                             className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
                           >
                             <Minus className="w-3 h-3" />
                           </button>
                           <span className="w-8 text-center text-xs font-medium">{item.quantity}</span>
                           <button 
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            onClick={() => void updateQuantity(item.id, item.quantity + 1)}
                             className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
                           >
                             <Plus className="w-3 h-3" />
                           </button>
                         </div>
-                        <span className="font-medium text-primary">${(item.price * item.quantity).toLocaleString()}</span>
+                        <span className="font-medium text-primary">{formatPrice(item.price * item.quantity)}</span>
                       </div>
                     </div>
                   </motion.div>
@@ -136,7 +126,7 @@ export function CartDrawer() {
           <div className="p-6 bg-muted/50 border-t border-border space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Subtotal</span>
-              <span className="text-xl font-heading font-medium">${subtotal.toLocaleString()}</span>
+              <span className="text-xl font-heading font-medium">{formatPrice(subtotal)}</span>
             </div>
             <p className="text-xs text-muted-foreground">Shipping & taxes calculated at checkout.</p>
             <Link 

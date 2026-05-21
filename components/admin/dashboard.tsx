@@ -4,6 +4,7 @@ import { AlertTriangle, DollarSign, Package, CreditCard, TrendingUp, AlertCircle
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useCurrency } from "@/components/store/currency-context";
 
 const salesData = [
   { name: "Mon", total: Math.floor(Math.random() * 5000) + 1000 },
@@ -16,6 +17,8 @@ const salesData = [
 ];
 
 export function AdminDashboard() {
+  const { formatPrice, currencySymbol } = useCurrency();
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -33,7 +36,9 @@ export function AdminDashboard() {
           <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="font-semibold text-destructive">Overdue Instalments</h3>
-              <p className="text-sm text-destructive/80 mt-1">3 customers have overdue payments. Total outstanding: $1,250.00</p>
+              <p className="text-sm text-destructive/80 mt-1">
+                3 customers have overdue payments. Total outstanding: {formatPrice(1250)}
+              </p>
             </div>
             <button className="whitespace-nowrap bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium rounded-md hover:bg-destructive/90 transition-colors shadow-sm">
               Review Overdue
@@ -47,7 +52,9 @@ export function AdminDashboard() {
           <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="font-semibold text-orange-800">Payments Due Soon</h3>
-              <p className="text-sm text-orange-700 mt-1">12 instalments are due within the next 3 days. Total expected: $4,580.00</p>
+              <p className="text-sm text-orange-700 mt-1">
+                12 instalments are due within the next 3 days. Total expected: {formatPrice(4580)}
+              </p>
             </div>
             <button className="whitespace-nowrap bg-orange-100 text-orange-800 border border-orange-200 px-4 py-2 text-sm font-medium rounded-md hover:bg-orange-200 transition-colors">
               View Due Soon
@@ -64,7 +71,7 @@ export function AdminDashboard() {
             <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-heading">$45,231.89</div>
+            <div className="text-2xl font-bold font-heading">{formatPrice(45231.89)}</div>
             <p className="text-xs text-green-600 flex items-center mt-1">
               <TrendingUp className="w-3 h-3 mr-1" /> +20.1% from last month
             </p>
@@ -116,7 +123,13 @@ export function AdminDashboard() {
                 <LineChart data={salesData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5E0" />
                   <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
+                  <YAxis
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `${currencySymbol}${value}`}
+                  />
                   <Tooltip 
                     contentStyle={{ backgroundColor: "#FFFFFF", borderRadius: "8px", border: "1px solid #E5E5E0", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
                     itemStyle={{ color: "#1C1C1A" }}
@@ -136,18 +149,18 @@ export function AdminDashboard() {
           <CardContent>
             <div className="space-y-6">
               {[
-                { name: "Aria Lounge Chair", sales: 245, revenue: "$306,250" },
-                { name: "Nordic Minimalist Sofa", sales: 180, revenue: "$612,000" },
-                { name: "Walnut Dining Table", sales: 124, revenue: "$347,200" },
-                { name: "Ceramic Table Lamp", sales: 89, revenue: "$40,050" },
-                { name: "Velvet Accent Chair", sales: 76, revenue: "$67,640" },
+                { name: "Aria Lounge Chair", sales: 245, revenue: 306250 },
+                { name: "Nordic Minimalist Sofa", sales: 180, revenue: 612000 },
+                { name: "Walnut Dining Table", sales: 124, revenue: 347200 },
+                { name: "Ceramic Table Lamp", sales: 89, revenue: 40050 },
+                { name: "Velvet Accent Chair", sales: 76, revenue: 67640 },
               ].map((product, i) => (
                 <div key={i} className="flex items-center justify-between">
                   <div className="space-y-1">
                     <p className="text-sm font-medium leading-none">{product.name}</p>
                     <p className="text-xs text-muted-foreground">{product.sales} sales</p>
                   </div>
-                  <div className="font-medium text-sm">{product.revenue}</div>
+                  <div className="font-medium text-sm">{formatPrice(product.revenue)}</div>
                 </div>
               ))}
             </div>
@@ -174,10 +187,10 @@ export function AdminDashboard() {
               </thead>
               <tbody className="divide-y divide-border">
                 {[
-                  { id: "#ORD-9430", customer: "Liam Johnson", date: "Today, 10:42 AM", status: "Processing", amount: "$3,400.00" },
-                  { id: "#ORD-9429", customer: "Emma Davis", date: "Today, 09:15 AM", status: "Shipped", amount: "$1,250.00" },
-                  { id: "#ORD-9428", customer: "Noah Smith", date: "Yesterday, 04:30 PM", status: "Pending", amount: "$4,500.00" },
-                  { id: "#ORD-9427", customer: "Olivia Wilson", date: "Yesterday, 11:20 AM", status: "Delivered", amount: "$850.00" },
+                  { id: "#ORD-9430", customer: "Liam Johnson", date: "Today, 10:42 AM", status: "Processing", amount: 3400 },
+                  { id: "#ORD-9429", customer: "Emma Davis", date: "Today, 09:15 AM", status: "Shipped", amount: 1250 },
+                  { id: "#ORD-9428", customer: "Noah Smith", date: "Yesterday, 04:30 PM", status: "Pending", amount: 4500 },
+                  { id: "#ORD-9427", customer: "Olivia Wilson", date: "Yesterday, 11:20 AM", status: "Delivered", amount: 850 },
                 ].map((order, i) => (
                   <tr key={i} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 font-medium">{order.id}</td>
@@ -193,7 +206,7 @@ export function AdminDashboard() {
                         {order.status}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-right font-medium">{order.amount}</td>
+                    <td className="px-4 py-3 text-right font-medium">{formatPrice(order.amount)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Search, Filter, Edit, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useCurrency } from "@/components/store/currency-context";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { CategoriesManagement } from "./categories-management";
@@ -21,6 +22,7 @@ type ProductRow = {
 };
 
 export function ProductsManagement() {
+  const { formatPrice } = useCurrency();
   const [catalogTab, setCatalogTab] = useState("products");
   const [activeTab, setActiveTab] = useState("all");
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -199,7 +201,7 @@ export function ProductsManagement() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-foreground">{product.category}</td>
-                        <td className="px-6 py-4 font-medium text-foreground">${product.price.toLocaleString()}</td>
+                        <td className="px-6 py-4 font-medium text-foreground">{formatPrice(product.price)}</td>
                         <td className="px-6 py-4 text-foreground">{product.stock}</td>
                         <td className="px-6 py-4">
                           <Badge variant="outline" className={`font-normal rounded-md text-xs

@@ -20,6 +20,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useCurrency } from "@/components/store/currency-context";
 
 export type Product = {
   id: string;
@@ -32,6 +33,7 @@ export type Product = {
 };
 
 export function ProductListing({ initialProducts }: { initialProducts: Product[] }) {
+  const { formatPrice } = useCurrency();
   const [view, setView] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState("featured");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -42,10 +44,10 @@ export function ProductListing({ initialProducts }: { initialProducts: Product[]
 
   const priceRanges = [
     { label: "All Prices", value: "All" },
-    { label: "Under $500", value: "under-500" },
-    { label: "$500 - $1,000", value: "500-1000" },
-    { label: "$1,000 - $2,000", value: "1000-2000" },
-    { label: "Over $2,000", value: "over-2000" }
+    { label: `Under ${formatPrice(500)}`, value: "under-500" },
+    { label: `${formatPrice(500)} - ${formatPrice(1000)}`, value: "500-1000" },
+    { label: `${formatPrice(1000)} - ${formatPrice(2000)}`, value: "1000-2000" },
+    { label: `Over ${formatPrice(2000)}`, value: "over-2000" }
   ];
 
   // Filtering
@@ -246,7 +248,7 @@ export function ProductListing({ initialProducts }: { initialProducts: Product[]
                       </h3>
                     </Link>
                     <p className={`text-primary ${view === "list" ? "text-lg mb-4" : "text-sm mt-1"}`}>
-                      ${product.basePrice.toLocaleString()}
+                      {formatPrice(product.basePrice)}
                     </p>
                     {view === "list" && (
                       <p className="text-muted-foreground text-sm line-clamp-3 mb-6">

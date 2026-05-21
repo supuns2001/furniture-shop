@@ -56,7 +56,7 @@ export function BrandStory() {
               </h2>
               <div className="space-y-6 text-muted-foreground text-lg font-light leading-relaxed">
                 <p>
-                  At Lumen, we believe that furniture is more than just functional pieces occupying space. It is an expression of your aesthetic, a testament to your taste, and the silent backdrop to your life's most meaningful moments.
+                  At Lumen, we believe that furniture is more than just functional pieces occupying space. It is an expression of your aesthetic, a testament to your taste, and the silent backdrop to your life&apos;s most meaningful moments.
                 </p>
                 <p>
                   Since our inception, we have partnered with master artisans globally to bring you collections that blend timeless elegance with contemporary innovation. Every joint, stitch, and finish is executed with an uncompromising commitment to quality.

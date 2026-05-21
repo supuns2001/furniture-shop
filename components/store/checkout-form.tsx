@@ -1,290 +1,659 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
+
+import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ChevronRight, CreditCard, Wallet } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Check, ChevronRight, CreditCard, Wallet, Loader2,
+  MapPin, ChevronDown, ShoppingBag, Package, ArrowLeft,
+} from "lucide-react";
+import { useCurrency } from "@/components/store/currency-context";
+import { useCart } from "@/components/store/cart-context";
+import { toast } from "sonner";
 
-export function CheckoutForm() {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [paymentMethod, setPaymentMethod] = useState<"full" | "emi">("full");
-  const [emiMonths, setEmiMonths] = useState<3 | 6 | 12>(3);
+/* ── Types ── */
+type Address = {
+  id: string; street: string; city: string;
+  state: string; zipCode: string; country: string; isDefault: boolean;
+};
 
-  // Mock cart
-  const cartTotal = 1250;
-  const depositAmount = paymentMethod === "emi" ? cartTotal / emiMonths : cartTotal;
+type ShippingForm = {
+  firstName: string; lastName: string; email: string; phone: string;
+  street: string; city: string; state: string; zipCode: string;
+  country: string; saveAddress: boolean;
+};
 
-  const nextStep = () => {
-    if (step < 3) setStep((step + 1) as 1 | 2 | 3);
-  };
+const EMPTY_FORM: ShippingForm = {
+  firstName: "", lastName: "", email: "", phone: "",
+  street: "", city: "", state: "", zipCode: "", country: "Sri Lanka", saveAddress: false,
+};
 
+/* ── Step indicator ── */
+const STEPS = ["Shipping", "Payment", "Review"];
+
+function StepBar({ step }: { step: number }) {
   return (
-    <div className="container mx-auto px-6 py-12 max-w-6xl">
-      <h1 className="text-3xl font-heading text-foreground mb-8">Checkout</h1>
-      
-      <div className="flex flex-col lg:flex-row gap-16">
-        {/* Main Checkout Area */}
-        <div className="w-full lg:w-2/3">
-          {/* Progress Indicator */}
-          <div className="flex items-center mb-12">
-            {["Address", "Payment", "Confirm"].map((label, index) => {
-              const stepNumber = index + 1;
-              const isActive = step === stepNumber;
-              const isCompleted = step > stepNumber;
-              
-              return (
-                <div key={label} className="flex items-center">
-                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium ${
-                    isActive ? "bg-primary text-primary-foreground" : 
-                    isCompleted ? "bg-foreground text-background" : 
-                    "bg-muted text-muted-foreground"
-                  }`}>
-                    {isCompleted ? <Check className="w-4 h-4" /> : stepNumber}
-                  </div>
-                  <span className={`ml-3 text-sm font-medium tracking-wide uppercase ${
-                    isActive ? "text-foreground" : "text-muted-foreground"
-                  }`}>
-                    {label}
-                  </span>
-                  {index < 2 && <ChevronRight className="w-4 h-4 mx-4 text-border" />}
-                </div>
-              );
-            })}
+    <div className="flex items-center mb-10">
+      {STEPS.map((label, i) => {
+        const n = i + 1;
+        const done = step > n;
+        const active = step === n;
+        return (
+          <div key={label} className="flex items-center">
+            <div className={`flex items-center justify-center w-8 h-8 text-xs font-semibold transition-all ${
+              done   ? "bg-foreground text-background" :
+              active ? "bg-primary text-primary-foreground" :
+                       "bg-muted text-muted-foreground"
+            }`}>
+              {done ? <Check className="w-4 h-4" /> : n}
+            </div>
+            <span className={`ml-2.5 text-xs font-medium uppercase tracking-widest ${active ? "text-foreground" : "text-muted-foreground"}`}>
+              {label}
+            </span>
+            {i < STEPS.length - 1 && <ChevronRight className="w-4 h-4 mx-4 text-border" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════
+   MAIN COMPONENT
+══════════════════════════════════════ */
+export function CheckoutForm() {
+  const { formatPrice } = useCurrency();
+  const { cartItems, cartTotal, clearCart } = useCart();
+  const { data: session } = useSession();
+
+
+  const userId = (session?.user as Record<string, unknown>)?.id as string | undefined;
+
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState<ShippingForm>(EMPTY_FORM);
+  const [paymentMethod, setPaymentMethod] = useState<"FULL_PAYMENT" | "INSTALMENT">("FULL_PAYMENT");
+  const [emiMonths, setEmiMonths] = useState<3 | 6 | 12>(3);
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [showAddressDropdown, setShowAddressDropdown] = useState(false);
+  const [isPlacing, setIsPlacing] = useState(false);
+  const [placedOrder, setPlacedOrder] = useState<{ orderId: string; totalAmount: number } | null>(null);
+
+  const monthly = parseFloat((cartTotal / emiMonths).toFixed(2));
+  const dueTodayEmi = monthly;
+
+  /* ── Pre-fill session user's data ── */
+  useEffect(() => {
+    if (session?.user) {
+      const [first, ...rest] = (session.user.name || "").split(" ");
+      const timer = setTimeout(() => {
+        setForm(f => ({
+          ...f,
+          firstName: first || "",
+          lastName: rest.join(" "),
+          email: session.user?.email || "",
+        }));
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [session]);
+
+  /* ── Load saved addresses ── */
+  useEffect(() => {
+    if (!userId) return;
+    fetch(`/api/account/addresses?userId=${userId}`)
+      .then(r => r.json())
+      .then((data: Address[]) => {
+        if (Array.isArray(data)) {
+          setSavedAddresses(data);
+          const def = data.find(a => a.isDefault) || data[0];
+          if (def) applySavedAddress(def);
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  function applySavedAddress(addr: Address) {
+    setSelectedAddressId(addr.id);
+    const [first, ...rest] = (session?.user?.name || "").split(" ");
+    setForm(f => ({
+      ...f,
+      firstName: first || f.firstName,
+      lastName: rest.join(" ") || f.lastName,
+      street: addr.street,
+      city: addr.city,
+      state: addr.state,
+      zipCode: addr.zipCode,
+      country: addr.country,
+    }));
+  }
+
+  /* ── Validation ── */
+  function validateStep1() {
+    const required: (keyof ShippingForm)[] = ["firstName", "email", "street", "city", "zipCode"];
+    for (const k of required) {
+      if (!form[k]) { toast.error(`Please fill in all required fields.`); return false; }
+    }
+    if (!/\S+@\S+\.\S+/.test(form.email)) { toast.error("Enter a valid email."); return false; }
+    return true;
+  }
+
+  /* ── Place order ── */
+  async function placeOrder() {
+    setIsPlacing(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: userId || null,
+          guestEmail: !userId ? form.email : null,
+          cartItems: cartItems.map(i => ({
+            productId: i.productId,
+            name: i.name,
+            price: i.price,
+            quantity: i.quantity,
+          })),
+          paymentMethod,
+          emiMonths: paymentMethod === "INSTALMENT" ? emiMonths : null,
+          shippingAddress: {
+            street: form.street,
+            city: form.city,
+            state: form.state,
+            zipCode: form.zipCode,
+            country: form.country,
+          },
+          saveAddress: form.saveAddress && !!userId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Failed to place order."); return; }
+
+      // Clear cart
+      await clearCart();
+      setPlacedOrder(data);
+      setStep(4);
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsPlacing(false);
+    }
+  }
+
+  /* ── Empty cart guard ── */
+  if (cartItems.length === 0 && !placedOrder) {
+    return (
+      <div className="container mx-auto px-6 py-24 max-w-6xl text-center space-y-6">
+        <ShoppingBag className="w-16 h-16 text-muted-foreground/30 mx-auto" />
+        <h1 className="text-2xl font-heading">Your cart is empty</h1>
+        <p className="text-muted-foreground">Add some items before checking out.</p>
+        <Link href="/products" className="inline-block bg-foreground text-background px-8 py-3.5 text-sm font-medium uppercase tracking-widest hover:bg-primary transition-colors">
+          Browse Products
+        </Link>
+      </div>
+    );
+  }
+
+  /* ══ ORDER SUMMARY SIDEBAR ══ */
+  const renderOrderSummary = () => (
+    <div className="bg-muted/20 border border-border p-7 sticky top-32">
+      <h2 className="font-heading text-xl mb-5 pb-4 border-b border-border">Order Summary</h2>
+
+      {/* Items */}
+      <div className="space-y-4 mb-5 max-h-72 overflow-y-auto pr-1">
+        {cartItems.map(item => (
+          <div key={item.id} className="flex gap-3">
+            <div className="w-16 h-16 relative bg-muted shrink-0 border border-border/30">
+              {item.image && <Image src={item.image} alt={item.name} fill className="object-cover" />}
+              <span className="absolute -top-2 -right-2 w-5 h-5 bg-foreground text-background text-[10px] font-bold flex items-center justify-center rounded-full">
+                {item.quantity}
+              </span>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium leading-tight">{item.name}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{item.variant}</p>
+              <p className="text-sm font-medium mt-1">{formatPrice(item.price * item.quantity)}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Totals */}
+      <div className="space-y-2.5 py-4 border-y border-border text-sm">
+        <div className="flex justify-between text-muted-foreground">
+          <span>Subtotal ({cartItems.reduce((s, i) => s + i.quantity, 0)} items)</span>
+          <span className="text-foreground">{formatPrice(cartTotal)}</span>
+        </div>
+        <div className="flex justify-between text-muted-foreground">
+          <span>Shipping</span>
+          <span className="text-emerald-600 font-medium">Free</span>
+        </div>
+        <div className="flex justify-between text-muted-foreground">
+          <span>Tax</span>
+          <span>Included</span>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center mt-5">
+        <span className="font-medium">Total</span>
+        <span className="text-2xl font-heading text-primary">{formatPrice(cartTotal)}</span>
+      </div>
+
+      {paymentMethod === "INSTALMENT" && (
+        <div className="mt-4 p-4 bg-primary/5 border border-primary/20 space-y-1.5 text-sm">
+          <div className="flex justify-between font-medium text-primary">
+            <span>Due Today</span>
+            <span>{formatPrice(dueTodayEmi)}</span>
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Monthly × {emiMonths - 1} more</span>
+            <span>{formatPrice(monthly)} / mo</span>
+          </div>
+          <p className="text-xs text-muted-foreground/70 mt-1">0% interest · Auto-debit on same date</p>
+        </div>
+      )}
+    </div>
+  );
+
+  /* ══ SUCCESS SCREEN ══ */
+  if (step === 4 && placedOrder) {
+    return (
+      <div className="container mx-auto px-6 py-16 max-w-2xl text-center">
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
+          <div className="w-24 h-24 bg-emerald-50 border-2 border-emerald-200 rounded-full flex items-center justify-center mx-auto">
+            <Check className="w-12 h-12 text-emerald-600" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-heading mb-3">Order Confirmed!</h1>
+            <p className="text-muted-foreground">
+              Thank you{session?.user?.name ? `, ${session.user.name.split(" ")[0]}` : ""}! Your order has been placed successfully.
+            </p>
           </div>
 
+          <div className="border border-border p-6 text-left space-y-3 bg-muted/20">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground uppercase tracking-wider text-xs">Order ID</span>
+              <span className="font-medium">#{placedOrder.orderId.slice(0, 8).toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground uppercase tracking-wider text-xs">Total Paid</span>
+              <span className="font-medium">{formatPrice(paymentMethod === "INSTALMENT" ? dueTodayEmi : placedOrder.totalAmount)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground uppercase tracking-wider text-xs">Payment</span>
+              <span className="font-medium">{paymentMethod === "INSTALMENT" ? `${emiMonths}-Month EMI` : "Full Payment"}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground uppercase tracking-wider text-xs">Status</span>
+              <span className="text-amber-600 font-medium">Pending</span>
+            </div>
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            A confirmation will be sent to <strong>{form.email}</strong>.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            {userId && (
+              <Link href="/account?tab=orders" className="flex items-center justify-center gap-2 border border-foreground px-8 py-3.5 text-sm font-medium uppercase tracking-widest hover:bg-foreground hover:text-background transition-all">
+                <Package className="w-4 h-4" />
+                View Orders
+              </Link>
+            )}
+            <Link href="/" className="flex items-center justify-center gap-2 bg-foreground text-background px-8 py-3.5 text-sm font-medium uppercase tracking-widest hover:bg-primary hover:text-primary-foreground transition-all">
+              Continue Shopping
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  /* ══ MAIN CHECKOUT LAYOUT ══ */
+  return (
+    <div className="container mx-auto px-4 sm:px-6 py-10 max-w-6xl">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-widest mb-8">
+        <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
+        <ChevronRight className="w-3 h-3" />
+        <Link href="/products" className="hover:text-foreground transition-colors">Shop</Link>
+        <ChevronRight className="w-3 h-3" />
+        <span className="text-foreground">Checkout</span>
+      </div>
+
+      <h1 className="text-3xl font-heading mb-8">Checkout</h1>
+
+      <div className="flex flex-col lg:flex-row gap-12">
+        {/* ── Form area ── */}
+        <div className="w-full lg:w-[60%]">
+          <StepBar step={step} />
+
           <AnimatePresence mode="wait">
-            {/* Step 1: Address */}
+
+            {/* ════ STEP 1 — SHIPPING ════ */}
             {step === 1 && (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
+              <motion.div key="step1"
+                initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.2 }}
                 className="space-y-8"
               >
-                <div className="space-y-4">
-                  <h2 className="text-xl font-medium">Contact Information</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email address</Label>
-                      <Input id="email" type="email" className="rounded-none border-border focus-visible:ring-primary h-12" />
+                {/* Saved addresses dropdown */}
+                {savedAddresses.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Use a saved address</p>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowAddressDropdown(v => !v)}
+                        className="w-full flex justify-between items-center border border-border px-4 py-3 text-sm text-left hover:border-foreground transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-muted-foreground" />
+                          {selectedAddressId
+                            ? (() => {
+                                const a = savedAddresses.find(x => x.id === selectedAddressId);
+                                return a ? `${a.street}, ${a.city}` : "Select address";
+                              })()
+                            : "Select a saved address"}
+                        </div>
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                      <AnimatePresence>
+                        {showAddressDropdown && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                            className="absolute z-20 w-full border border-border bg-background shadow-lg mt-1"
+                          >
+                            {savedAddresses.map(addr => (
+                              <button key={addr.id}
+                                onClick={() => { applySavedAddress(addr); setShowAddressDropdown(false); }}
+                                className="w-full text-left px-4 py-3 text-sm hover:bg-muted transition-colors border-b border-border/50 last:border-0"
+                              >
+                                <p className="font-medium">{addr.street}</p>
+                                <p className="text-xs text-muted-foreground">{addr.city}, {addr.state} {addr.zipCode}</p>
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone number</Label>
-                      <Input id="phone" type="tel" className="rounded-none border-border focus-visible:ring-primary h-12" />
+                    <div className="flex items-center gap-3 my-5">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-xs text-muted-foreground">or enter manually</span>
+                      <div className="flex-1 h-px bg-border" />
                     </div>
+                  </div>
+                )}
+
+                {/* Contact */}
+                <div>
+                  <h2 className="text-base font-medium uppercase tracking-widest text-foreground mb-4">Contact</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[
+                      { id: "email", label: "Email *", type: "email", key: "email" as keyof ShippingForm, full: true },
+                      { id: "phone", label: "Phone", type: "tel", key: "phone" as keyof ShippingForm },
+                    ].map(({ id, label, type, key, full }) => (
+                      <div key={id} className={full ? "sm:col-span-2" : ""}>
+                        <label htmlFor={id} className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1.5">{label}</label>
+                        <input id={id} type={type}
+                          value={form[key] as string}
+                          onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                          className="w-full border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:border-foreground transition-colors"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <h2 className="text-xl font-medium mt-8">Shipping Address</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First name</Label>
-                      <Input id="firstName" className="rounded-none border-border focus-visible:ring-primary h-12" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last name</Label>
-                      <Input id="lastName" className="rounded-none border-border focus-visible:ring-primary h-12" />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="address">Address</Label>
-                      <Input id="address" className="rounded-none border-border focus-visible:ring-primary h-12" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
-                      <Input id="city" className="rounded-none border-border focus-visible:ring-primary h-12" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="zipCode">ZIP Code</Label>
-                      <Input id="zipCode" className="rounded-none border-border focus-visible:ring-primary h-12" />
-                    </div>
+                {/* Shipping address */}
+                <div>
+                  <h2 className="text-base font-medium uppercase tracking-widest text-foreground mb-4">Shipping Address</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[
+                      { id: "firstName", label: "First Name *", key: "firstName" as keyof ShippingForm },
+                      { id: "lastName",  label: "Last Name",    key: "lastName" as keyof ShippingForm },
+                      { id: "street",    label: "Address *",    key: "street" as keyof ShippingForm,  full: true },
+                      { id: "city",      label: "City *",       key: "city" as keyof ShippingForm },
+                      { id: "state",     label: "State / Province", key: "state" as keyof ShippingForm },
+                      { id: "zipCode",   label: "ZIP Code *",   key: "zipCode" as keyof ShippingForm },
+                      { id: "country",   label: "Country",      key: "country" as keyof ShippingForm },
+                    ].map(({ id, label, key, full }) => (
+                      <div key={id} className={full ? "sm:col-span-2" : ""}>
+                        <label htmlFor={id} className="block text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1.5">{label}</label>
+                        <input id={id}
+                          value={form[key] as string}
+                          onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                          className="w-full border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:border-foreground transition-colors"
+                        />
+                      </div>
+                    ))}
                   </div>
+
+                  {userId && (
+                    <label className="flex items-center gap-2.5 mt-4 text-sm cursor-pointer">
+                      <input type="checkbox" checked={form.saveAddress}
+                        onChange={e => setForm(f => ({ ...f, saveAddress: e.target.checked }))}
+                        className="w-4 h-4 border border-border"
+                      />
+                      Save this address to my account
+                    </label>
+                  )}
                 </div>
 
-                <button 
-                  onClick={nextStep}
-                  className="w-full md:w-auto bg-foreground text-background px-10 py-4 text-sm font-medium tracking-widest uppercase hover:bg-primary transition-colors"
+                <button onClick={() => { if (validateStep1()) setStep(2); }}
+                  className="w-full sm:w-auto bg-foreground text-background px-10 py-4 text-sm font-medium uppercase tracking-widest hover:bg-primary hover:text-primary-foreground transition-all"
                 >
                   Continue to Payment
                 </button>
               </motion.div>
             )}
 
-            {/* Step 2: Payment */}
+            {/* ════ STEP 2 — PAYMENT ════ */}
             {step === 2 && (
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
+              <motion.div key="step2"
+                initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.2 }}
                 className="space-y-8"
               >
-                <div className="space-y-4">
-                  <h2 className="text-xl font-medium">Payment Method</h2>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button
-                      onClick={() => setPaymentMethod("full")}
-                      className={`flex items-center gap-4 p-6 border transition-all ${
-                        paymentMethod === "full" ? "border-primary bg-primary/5" : "border-border hover:border-foreground/30"
-                      }`}
-                    >
-                      <CreditCard className={`w-6 h-6 ${paymentMethod === "full" ? "text-primary" : "text-muted-foreground"}`} />
-                      <div className="text-left">
-                        <h3 className="font-medium">Full Payment</h3>
-                        <p className="text-sm text-muted-foreground">Pay the total amount now</p>
-                      </div>
-                    </button>
-                    
-                    <button
-                      onClick={() => setPaymentMethod("emi")}
-                      className={`flex items-center gap-4 p-6 border transition-all ${
-                        paymentMethod === "emi" ? "border-primary bg-primary/5" : "border-border hover:border-foreground/30"
-                      }`}
-                    >
-                      <Wallet className={`w-6 h-6 ${paymentMethod === "emi" ? "text-primary" : "text-muted-foreground"}`} />
-                      <div className="text-left">
-                        <h3 className="font-medium">Installment Plan</h3>
-                        <p className="text-sm text-muted-foreground">0% Interest EMI</p>
-                      </div>
-                    </button>
+                <div>
+                  <h2 className="text-base font-medium uppercase tracking-widest mb-4">Payment Method</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[
+                      { val: "FULL_PAYMENT",  label: "Full Payment",      sub: "Pay the total amount now",  icon: CreditCard },
+                      { val: "INSTALMENT",    label: "Installment (EMI)",  sub: "Split into monthly payments", icon: Wallet },
+                    ].map(({ val, label, sub, icon: Icon }) => (
+                      <button key={val}
+                        onClick={() => setPaymentMethod(val as "FULL_PAYMENT" | "INSTALMENT")}
+                        className={`flex items-center gap-4 p-5 border text-left transition-all ${
+                          paymentMethod === val
+                            ? "border-foreground bg-foreground/5"
+                            : "border-border hover:border-foreground/40"
+                        }`}
+                      >
+                        <div className={`w-10 h-10 flex items-center justify-center shrink-0 ${
+                          paymentMethod === val ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
+                        }`}>
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{label}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+                        </div>
+                        {paymentMethod === val && <Check className="w-4 h-4 ml-auto text-foreground" />}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
+                {/* EMI tenure selector */}
                 <AnimatePresence>
-                  {paymentMethod === "emi" && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden space-y-4"
+                  {paymentMethod === "INSTALMENT" && (
+                    <motion.div key="emi"
+                      initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }} className="overflow-hidden"
                     >
-                      <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-widest">Select Tenure</h3>
-                      <div className="flex gap-4">
-                        {[3, 6, 12].map((months) => (
-                          <button
-                            key={months}
-                            onClick={() => setEmiMonths(months as 3 | 6 | 12)}
-                            className={`flex-1 py-3 text-sm font-medium border transition-all ${
-                              emiMonths === months ? "border-primary text-primary" : "border-border text-muted-foreground"
-                            }`}
-                          >
-                            {months} Months
-                          </button>
-                        ))}
-                      </div>
-                      <div className="bg-muted p-4 text-sm mt-4">
-                        <p className="mb-2"><strong>Deposit Due Today:</strong> ${(cartTotal / emiMonths).toFixed(2)}</p>
-                        <p className="text-muted-foreground">Remaining balance will be billed monthly over {emiMonths - 1} months.</p>
+                      <div className="border border-border p-6 space-y-5">
+                        <h3 className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Select Tenure</h3>
+                        <div className="grid grid-cols-3 gap-3">
+                          {([3, 6, 12] as const).map(m => (
+                            <button key={m}
+                              onClick={() => setEmiMonths(m)}
+                              className={`py-4 text-center border transition-all ${
+                                emiMonths === m
+                                  ? "border-foreground bg-foreground text-background"
+                                  : "border-border hover:border-foreground/50"
+                              }`}
+                            >
+                              <p className="text-lg font-heading">{m}</p>
+                              <p className="text-xs uppercase tracking-wider mt-0.5">months</p>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="bg-muted/50 p-4 space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Monthly Payment</span>
+                            <span className="font-medium">{formatPrice(monthly)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Due Today (1st installment)</span>
+                            <span className="font-medium">{formatPrice(dueTodayEmi)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Interest Rate</span>
+                            <span className="text-emerald-600 font-medium">0%</span>
+                          </div>
+                          <div className="flex justify-between border-t border-border pt-2 font-medium">
+                            <span>Total Amount</span>
+                            <span>{formatPrice(cartTotal)}</span>
+                          </div>
+                        </div>
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                <div className="space-y-4 mt-8">
-                  <h2 className="text-xl font-medium">Card Details</h2>
-                  <div className="bg-muted p-6 rounded-sm border border-border flex items-center justify-center h-32">
-                    <p className="text-muted-foreground text-sm">Stripe Payment Element would load here</p>
+                {/* Payment notice */}
+                <div className="bg-muted/30 border border-border p-5 text-sm text-muted-foreground flex gap-3">
+                  <CreditCard className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-foreground mb-1">Secure Payment</p>
+                    <p>Payment processing is handled securely. This is a demo — no real charges will be made.</p>
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center mt-8">
-                  <button 
-                    onClick={() => setStep(1)}
-                    className="text-sm font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Back to Address
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <button onClick={() => setStep(1)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Shipping
                   </button>
-                  <button 
-                    onClick={nextStep}
-                    className="bg-foreground text-background px-10 py-4 text-sm font-medium tracking-widest uppercase hover:bg-primary transition-colors"
+                  <button onClick={() => setStep(3)}
+                    className="bg-foreground text-background px-10 py-4 text-sm font-medium uppercase tracking-widest hover:bg-primary hover:text-primary-foreground transition-all"
                   >
-                    Pay ${depositAmount.toFixed(2)}
+                    Review Order
                   </button>
                 </div>
               </motion.div>
             )}
 
-            {/* Step 3: Confirm */}
+            {/* ════ STEP 3 — REVIEW ════ */}
             {step === 3 && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center py-16"
+              <motion.div key="step3"
+                initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.2 }}
+                className="space-y-6"
               >
-                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Check className="w-10 h-10 text-primary" />
+                <h2 className="text-base font-medium uppercase tracking-widest">Review Your Order</h2>
+
+                {/* Shipping summary */}
+                <div className="border border-border">
+                  <div className="flex justify-between items-center px-5 py-3.5 bg-muted/30 border-b border-border">
+                    <p className="text-xs font-medium uppercase tracking-widest">Shipping Address</p>
+                    <button onClick={() => setStep(1)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Edit</button>
+                  </div>
+                  <div className="px-5 py-4 text-sm space-y-0.5">
+                    <p className="font-medium">{form.firstName} {form.lastName}</p>
+                    <p className="text-muted-foreground">{form.street}</p>
+                    <p className="text-muted-foreground">{form.city}{form.state ? `, ${form.state}` : ""} {form.zipCode}</p>
+                    <p className="text-muted-foreground">{form.country}</p>
+                    <p className="text-muted-foreground mt-1">{form.email}</p>
+                  </div>
                 </div>
-                <h2 className="text-3xl font-heading mb-4">Order Confirmed</h2>
-                <p className="text-muted-foreground max-w-md mx-auto mb-8">
-                  Thank you for your purchase. Your order number is #ORD-9430. We've sent a confirmation email with your order details.
+
+                {/* Payment summary */}
+                <div className="border border-border">
+                  <div className="flex justify-between items-center px-5 py-3.5 bg-muted/30 border-b border-border">
+                    <p className="text-xs font-medium uppercase tracking-widest">Payment</p>
+                    <button onClick={() => setStep(2)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Edit</button>
+                  </div>
+                  <div className="px-5 py-4 text-sm">
+                    {paymentMethod === "FULL_PAYMENT" ? (
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-muted-foreground" />
+                        <span>Full Payment — {formatPrice(cartTotal)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Wallet className="w-4 h-4 text-muted-foreground" />
+                        <span>{emiMonths}-Month EMI — {formatPrice(monthly)}/mo · Due today: {formatPrice(dueTodayEmi)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Items summary */}
+                <div className="border border-border">
+                  <div className="px-5 py-3.5 bg-muted/30 border-b border-border">
+                    <p className="text-xs font-medium uppercase tracking-widest">{cartItems.length} Items</p>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {cartItems.map(item => (
+                      <div key={item.id} className="flex justify-between items-center px-5 py-3.5 text-sm">
+                        <div>
+                          <span className="font-medium">{item.name}</span>
+                          <span className="text-muted-foreground ml-2">× {item.quantity}</span>
+                          {item.variant !== "Default" && <span className="text-xs text-muted-foreground block mt-0.5">{item.variant}</span>}
+                        </div>
+                        <span className="font-medium">{formatPrice(item.price * item.quantity)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Place order */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
+                  <button onClick={() => setStep(2)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Payment
+                  </button>
+                  <button
+                    onClick={placeOrder}
+                    disabled={isPlacing}
+                    className="flex items-center gap-2 bg-primary text-primary-foreground px-10 py-4 text-sm font-medium uppercase tracking-widest hover:bg-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isPlacing ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Placing Order...</>
+                    ) : (
+                      <><Check className="w-4 h-4" /> Place Order — {formatPrice(paymentMethod === "INSTALMENT" ? dueTodayEmi : cartTotal)}</>
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  By placing your order, you agree to our Terms of Service and Privacy Policy.
                 </p>
-                <button 
-                  onClick={() => window.location.href = '/'}
-                  className="bg-foreground text-background px-10 py-4 text-sm font-medium tracking-widest uppercase hover:bg-primary transition-colors"
-                >
-                  Return to Home
-                </button>
               </motion.div>
             )}
+
           </AnimatePresence>
         </div>
 
-        {/* Order Summary */}
-        <div className="w-full lg:w-1/3">
-          <div className="bg-muted/30 p-8 border border-border sticky top-32">
-            <h2 className="font-heading text-2xl mb-6 pb-4 border-b border-border">Order Summary</h2>
-            
-            <div className="space-y-4 mb-6">
-              <div className="flex gap-4">
-                <div className="w-16 h-16 relative bg-muted shrink-0">
-                  <Image src="https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?q=80&w=200&auto=format&fit=crop" alt="Item" fill className="object-cover" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium text-sm">Aria Lounge Chair</h4>
-                  <p className="text-xs text-muted-foreground mt-1">Cream, Boucle</p>
-                  <p className="text-sm font-medium mt-2">$1,250.00</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 py-4 border-y border-border text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>$1,250.00</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Shipping</span>
-                <span>Free</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tax</span>
-                <span>Calculated at next step</span>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-end mt-6">
-              <span className="font-medium">Total</span>
-              <span className="text-2xl font-heading text-primary">${cartTotal.toFixed(2)}</span>
-            </div>
-
-            {paymentMethod === "emi" && (
-              <div className="mt-4 p-3 bg-primary/5 border border-primary/20 text-sm">
-                <div className="flex justify-between font-medium text-primary mb-1">
-                  <span>Due Today</span>
-                  <span>${depositAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Next Payment</span>
-                  <span>${depositAmount.toFixed(2)} in 1 month</span>
-                </div>
-              </div>
-            )}
-          </div>
+        {/* ── Sidebar ── */}
+        <div className="w-full lg:w-[40%]">
+          {renderOrderSummary()}
         </div>
       </div>
     </div>

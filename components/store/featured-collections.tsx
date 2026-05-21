@@ -11,21 +11,21 @@ const collections = [
     id: 1,
     title: "The Lounge Edit",
     subtitle: "Modern Living",
-    image: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=1200&auto=format&fit=crop",
+    image: "/images/luxury_living_room_hero.png",
     link: "/products?category=living",
   },
   {
     id: 2,
     title: "Artisan Dining",
     subtitle: "Gather Around",
-    image: "https://images.unsplash.com/photo-1617806118233-18e1c0945594?q=80&w=1200&auto=format&fit=crop",
+    image: "/images/luxury_dining_room_hero.png",
     link: "/products?category=dining",
   },
   {
     id: 3,
     title: "Serene Slumber",
     subtitle: "Bedroom Essentials",
-    image: "https://images.unsplash.com/photo-1505693314120-0d443867891c?q=80&w=1200&auto=format&fit=crop",
+    image: "/images/luxury_bedroom_hero.png",
     link: "/products?category=bedroom",
   }
 ];

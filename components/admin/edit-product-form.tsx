@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useCurrency } from "@/components/store/currency-context";
 
 type TaxonomyItem = {
   id: string;
@@ -63,6 +64,7 @@ export function EditProductForm({
   initialBrands,
 }: EditProductFormProps) {
   const router = useRouter();
+  const { currencySymbol } = useCurrency();
 
   // Core product details state (hydrated from existing product)
   const [name, setName] = useState(product.name);
@@ -504,7 +506,7 @@ export function EditProductForm({
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Price Offset ($)</Label>
+                      <Label className="text-xs">Price Offset ({currencySymbol})</Label>
                       <Input
                         type="number"
                         placeholder="0.00"
@@ -601,7 +603,7 @@ export function EditProductForm({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="price">Base Price ($)</Label>
+                <Label htmlFor="price">Base Price ({currencySymbol})</Label>
                 <Input
                   id="price"
                   type="number"

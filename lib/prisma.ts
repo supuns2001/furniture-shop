@@ -16,8 +16,9 @@ if (typeof window === "undefined") {
       password: decodeURIComponent(url.password || "MYSQLsupun@2001"),
       database: url.pathname.replace(/^\//, "") || "furniture_shop_db",
       connectionLimit: 5,
+      allowPublicKeyRetrieval: true,
     });
-  } catch (error) {
+  } catch {
     // Fallback static config
     adapter = new PrismaMariaDb({
       host: "localhost",
@@ -26,6 +27,7 @@ if (typeof window === "undefined") {
       password: "MYSQLsupun@2001",
       database: "furniture_shop_db",
       connectionLimit: 5,
+      allowPublicKeyRetrieval: true,
     });
   }
 

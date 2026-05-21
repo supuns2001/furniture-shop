@@ -11,17 +11,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useCurrency } from "@/components/store/currency-context";
 
 type EMICalculatorProps = {
   price: number;
 };
 
 export function EMICalculator({ price }: EMICalculatorProps) {
+  const { formatPrice } = useCurrency();
   const [selectedPlan, setSelectedPlan] = useState<3 | 6 | 12>(3);
   const interestRate = 0; // 0% interest for simplicity in luxury store
   
   const calculateEMI = (months: number) => {
-    return (price / months).toFixed(2);
+    return formatPrice(price / months);
   };
 
   const plans = [
@@ -70,9 +72,9 @@ export function EMICalculator({ price }: EMICalculatorProps) {
               transition={{ duration: 0.2 }}
               className="bg-muted p-6 rounded-sm space-y-4"
             >
-              <div className="flex justify-between items-center">
+               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground text-sm">Product Price</span>
-                <span className="text-foreground font-medium">${price.toLocaleString()}</span>
+                <span className="text-foreground font-medium">{formatPrice(price)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground text-sm">Interest Rate</span>
@@ -81,7 +83,7 @@ export function EMICalculator({ price }: EMICalculatorProps) {
               <div className="h-px bg-border my-2" />
               <div className="flex justify-between items-center">
                 <span className="text-foreground font-medium">Monthly Installment</span>
-                <span className="text-2xl text-primary font-heading">${calculateEMI(selectedPlan)}</span>
+                <span className="text-2xl text-primary font-heading">{calculateEMI(selectedPlan)}</span>
               </div>
             </motion.div>
           </AnimatePresence>
@@ -91,7 +93,7 @@ export function EMICalculator({ price }: EMICalculatorProps) {
             <ul className="text-sm text-muted-foreground space-y-2">
               <li className="flex gap-2">
                 <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                <span>Pay ${calculateEMI(selectedPlan)} today as your deposit.</span>
+                <span>Pay {calculateEMI(selectedPlan)} today as your deposit.</span>
               </li>
               <li className="flex gap-2">
                 <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />

@@ -264,3 +264,12 @@ model StaffRole {
   name        String   @unique
   permissions String   @db.Text 
 }
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+

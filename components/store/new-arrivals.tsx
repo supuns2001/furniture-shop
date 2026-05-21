@@ -4,6 +4,9 @@ import { useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useInView } from "framer-motion";
+import { useCurrency } from "@/components/store/currency-context";
+import { useCart } from "@/components/store/cart-context";
+import { toast } from "sonner";
 
 export type NewArrivalProduct = {
   id: string;
@@ -14,14 +17,30 @@ export type NewArrivalProduct = {
 };
 
 export function NewArrivals({ products: propProducts }: { products?: NewArrivalProduct[] }) {
+  const { formatPrice } = useCurrency();
+  const { addToCart } = useCart();
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
+
+  const handleQuickAdd = (e: React.MouseEvent, product: { id: string; name: string; price: number; image: string; slug: string }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addToCart({
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      image: product.image,
+      variant: "Default",
+    });
+    toast.success(`${product.name} added to cart!`);
+  };
 
   const activeProducts = propProducts && propProducts.length > 0
     ? propProducts.map(p => ({
         id: p.id,
         name: p.name,
-        price: `$${p.basePrice.toLocaleString()}`,
+        price: p.basePrice,
         image: p.images[0]?.url || "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=800&q=80",
         slug: p.slug
       }))
@@ -29,28 +48,28 @@ export function NewArrivals({ products: propProducts }: { products?: NewArrivalP
         {
           id: "1",
           name: "Aria Lounge Chair",
-          price: "$1,250",
+          price: 1250,
           image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?q=80&w=800&auto=format&fit=crop",
           slug: "aria-lounge-chair",
         },
         {
           id: "2",
           name: "Nordic Minimalist Sofa",
-          price: "$3,400",
+          price: 3400,
           image: "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?q=80&w=800&auto=format&fit=crop",
           slug: "nordic-minimalist-sofa",
         },
         {
           id: "3",
           name: "Walnut Dining Table",
-          price: "$2,800",
+          price: 2800,
           image: "https://images.unsplash.com/photo-1577140917170-285929fb55b7?q=80&w=800&auto=format&fit=crop",
           slug: "walnut-dining-table",
         },
         {
           id: "4",
           name: "Ceramic Table Lamp",
-          price: "$450",
+          price: 450,
           image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?q=80&w=800&auto=format&fit=crop",
           slug: "ceramic-table-lamp",
         },
@@ -98,7 +117,10 @@ export function NewArrivals({ products: propProducts }: { products?: NewArrivalP
                   />
                   {/* Quick Add Button overlay */}
                   <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 transform translate-y-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
-                    <button className="w-full bg-white/90 backdrop-blur text-foreground py-3 text-sm font-medium tracking-wide uppercase hover:bg-primary hover:text-primary-foreground transition-colors">
+                    <button
+                      onClick={(e) => handleQuickAdd(e, product)}
+                      className="w-full bg-white/90 backdrop-blur text-foreground py-3 text-sm font-medium tracking-wide uppercase hover:bg-primary hover:text-primary-foreground transition-colors"
+                    >
                       Quick Add
                     </button>
                   </div>
@@ -106,7 +128,7 @@ export function NewArrivals({ products: propProducts }: { products?: NewArrivalP
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="text-base font-medium text-foreground">{product.name}</h3>
-                    <p className="text-sm text-muted-foreground mt-1 text-primary">{product.price}</p>
+                    <p className="text-sm text-muted-foreground mt-1 text-primary">{formatPrice(product.price)}</p>
                   </div>
                 </div>
               </Link>

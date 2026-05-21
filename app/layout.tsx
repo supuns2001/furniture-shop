@@ -1,35 +1,42 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { cookies } from "next/headers";
+import { CurrencyProvider } from "@/components/store/currency-context";
+import { CartProvider } from "@/components/store/cart-context";
+import { AuthProvider } from "@/components/store/auth-provider";
+import { DEFAULT_CURRENCY } from "@/lib/currency";
+import { Toaster } from "sonner";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Luxury Furniture Shop",
   description: "High-end furniture and home decor.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const initialCurrency = cookieStore.get("store_currency")?.value || DEFAULT_CURRENCY;
+
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${playfair.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col font-sans text-foreground bg-background">
-        {children}
+        <AuthProvider>
+          <CurrencyProvider initialCurrency={initialCurrency}>
+            <CartProvider>
+              {children}
+              <Toaster position="bottom-right" richColors closeButton />
+            </CartProvider>
+          </CurrencyProvider>
+        </AuthProvider>
       </body>
     </html>
   );
 }
+
+

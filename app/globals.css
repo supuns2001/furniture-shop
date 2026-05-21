@@ -41,6 +41,8 @@
 }
 
 :root {
+  --font-inter: "Inter", system-ui, -apple-system, sans-serif;
+  --font-playfair: "Playfair Display", Georgia, serif;
   --background: #FAFAF7;
   --foreground: #1C1C1A;
   

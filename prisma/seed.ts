@@ -9,6 +9,7 @@ const adapter = new PrismaMariaDb({
   password: "MYSQLsupun@2001",
   database: "furniture_shop_db",
   connectionLimit: 5,
+  allowPublicKeyRetrieval: true,
 });
 
 const prisma = new PrismaClient({ adapter });
@@ -37,7 +38,7 @@ async function main() {
   console.log("Seeding began...");
 
   // 1. Create admin user
-  const adminUser = await prisma.user.create({
+  await prisma.user.create({
     data: {
       name: "Admin User",
       email: "admin@furnitureshop.com",

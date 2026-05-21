@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Heart, Share2, Info, ChevronRight, ChevronLeft, Minus, Plus } from "lucide-react";
 import { EMICalculator } from "./emi-calculator";
@@ -12,6 +13,9 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import type { Product } from "./product-listing";
+import { useCurrency } from "@/components/store/currency-context";
+import { useCart } from "@/components/store/cart-context";
+import { toast } from "sonner";
 
 type ProductVariant = {
   id: string;
@@ -28,6 +32,8 @@ type DetailedProduct = Product & {
 };
 
 export function ProductDetail({ product }: { product: DetailedProduct }) {
+  const { formatPrice } = useCurrency();
+  const { addToCart } = useCart();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(product.variants[0] || null);
   const [quantity, setQuantity] = useState(1);
@@ -35,6 +41,26 @@ export function ProductDetail({ product }: { product: DetailedProduct }) {
 
   const currentPrice = product.basePrice + (selectedVariant?.priceOffset || 0);
   const isInStock = (selectedVariant?.stock || 0) > 0;
+
+  const handleAddToCart = () => {
+    if (!isInStock) return;
+    const variantLabel = [selectedVariant?.color, selectedVariant?.material]
+      .filter(Boolean)
+      .map(s => s!.charAt(0).toUpperCase() + s!.slice(1))
+      .join(", ") || "Default";
+
+    addToCart({
+      productId: product.id,
+      name: product.name,
+      price: currentPrice,
+      quantity: quantity,
+      image: product.images[0]?.url || "",
+      variant: variantLabel,
+    });
+
+    toast.success(`${quantity} x ${product.name} (${variantLabel}) added to cart!`);
+  };
+
 
   const nextImage = () => {
     setActiveImageIndex((prev) => (prev + 1) % product.images.length);
@@ -48,11 +74,11 @@ export function ProductDetail({ product }: { product: DetailedProduct }) {
     <div className="container mx-auto px-6 py-12">
       {/* Breadcrumbs */}
       <div className="flex items-center text-xs text-muted-foreground tracking-widest uppercase mb-8">
-        <a href="/" className="hover:text-primary transition-colors">Home</a>
+        <Link href="/" className="hover:text-primary transition-colors">Home</Link>
         <ChevronRight className="w-3 h-3 mx-2" />
-        <a href={`/products?category=${product.category?.name.toLowerCase()}`} className="hover:text-primary transition-colors">
+        <Link href={`/products?category=${product.category?.name.toLowerCase()}`} className="hover:text-primary transition-colors">
           {product.category?.name}
-        </a>
+        </Link>
         <ChevronRight className="w-3 h-3 mx-2" />
         <span className="text-foreground">{product.name}</span>
       </div>
@@ -128,7 +154,7 @@ export function ProductDetail({ product }: { product: DetailedProduct }) {
             </div>
             
             <p className="text-3xl text-primary font-medium mb-4">
-              ${currentPrice.toLocaleString()}
+              {formatPrice(currentPrice)}
             </p>
             
             {product.isEmiEligible && <EMICalculator price={currentPrice} />}
@@ -185,6 +211,7 @@ export function ProductDetail({ product }: { product: DetailedProduct }) {
           <div className="flex flex-col gap-4">
             <button 
               disabled={!isInStock}
+              onClick={handleAddToCart}
               className={`w-full py-4 text-sm font-medium tracking-widest uppercase transition-all duration-300 ${
                 isInStock 
                   ? "bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-lg hover:-translate-y-1" 
@@ -195,7 +222,7 @@ export function ProductDetail({ product }: { product: DetailedProduct }) {
             </button>
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-2">
               <Info className="w-4 h-4" />
-              <span>Free shipping on orders over $1,000.</span>
+              <span>Free shipping on orders over {formatPrice(1000)}.</span>
             </div>
           </div>
           
@@ -211,10 +238,10 @@ export function ProductDetail({ product }: { product: DetailedProduct }) {
               </TabsContent>
               <TabsContent value="dimensions" className="pt-6 text-sm text-muted-foreground leading-relaxed">
                 <ul className="space-y-2">
-                  <li><strong className="text-foreground font-medium">Width:</strong> 85" (216 cm)</li>
-                  <li><strong className="text-foreground font-medium">Depth:</strong> 38" (96.5 cm)</li>
-                  <li><strong className="text-foreground font-medium">Height:</strong> 32" (81 cm)</li>
-                  <li><strong className="text-foreground font-medium">Seat Height:</strong> 18" (45.7 cm)</li>
+                  <li><strong className="text-foreground font-medium">Width:</strong> 85&quot; (216 cm)</li>
+                  <li><strong className="text-foreground font-medium">Depth:</strong> 38&quot; (96.5 cm)</li>
+                  <li><strong className="text-foreground font-medium">Height:</strong> 32&quot; (81 cm)</li>
+                  <li><strong className="text-foreground font-medium">Seat Height:</strong> 18&quot; (45.7 cm)</li>
                 </ul>
               </TabsContent>
               <TabsContent value="care" className="pt-6 text-sm text-muted-foreground leading-relaxed">
