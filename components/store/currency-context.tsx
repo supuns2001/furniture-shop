@@ -20,15 +20,7 @@ export function CurrencyProvider({
   children: React.ReactNode;
   initialCurrency?: string;
 }) {
-  const [currencyCode, setCurrencyCode] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const match = document.cookie.match(/(^| )store_currency=([^;]+)/);
-      if (match && match[2] && CURRENCIES[match[2]]) {
-        return match[2];
-      }
-    }
-    return initialCurrency;
-  });
+  const [currencyCode, setCurrencyCode] = useState<string>(initialCurrency);
 
   const fetchCurrency = async () => {
     try {
@@ -47,7 +39,9 @@ export function CurrencyProvider({
   useEffect(() => {
     // Attempt to read from cookie first for fast rendering
     const match = document.cookie.match(/(^| )store_currency=([^;]+)/);
-    if (!match || !match[2] || !CURRENCIES[match[2]]) {
+    if (match && match[2] && CURRENCIES[match[2]]) {
+      setCurrencyCode(match[2]);
+    } else {
       const timer = setTimeout(() => {
         fetchCurrency();
       }, 0);

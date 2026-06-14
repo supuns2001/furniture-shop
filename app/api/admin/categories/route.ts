@@ -1,28 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAdminCategories, isDemoMode } from "@/lib/data-service";
 
 export async function GET() {
   try {
-    const categories = await prisma.category.findMany({
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-      orderBy: {
-        name: "asc",
-      },
-    });
-
-    // Format output to match client requirements
-    const formatted = categories.map((cat) => ({
-      id: cat.id,
-      name: cat.name,
-      slug: cat.slug,
-      productCount: cat._count.products,
-      status: "Active", // Standard dashboard visual fallback
-    }));
-
+    const formatted = await getAdminCategories();
     return NextResponse.json(formatted);
   } catch (error: any) {
     console.error("Error fetching categories:", error);
@@ -34,6 +16,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (isDemoMode()) {
+    return NextResponse.json(
+      { error: "Demo Mode: Write operations are disabled. Connect a real database to enable this feature." },
+      { status: 403 }
+    );
+  }
   try {
     const body = await request.json();
     const { name, slug: customSlug, description } = body;

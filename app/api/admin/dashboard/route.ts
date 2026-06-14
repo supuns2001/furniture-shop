@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getDashboardData, isDemoMode } from "@/lib/data-service";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // ── Demo Mode fast-path ───────────────────────────────────────────────
+  if (isDemoMode()) {
+    const data = await getDashboardData();
+    return NextResponse.json(data, {
+      headers: { "X-Demo-Mode": "true" },
+    });
+  }
+  // ── Real DB path ──────────────────────────────────────────────────────
+
   try {
     // 1. Check if there are products in the DB.
     const productCount = await prisma.product.count();

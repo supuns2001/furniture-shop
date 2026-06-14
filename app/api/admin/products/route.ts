@@ -1,37 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAdminProducts, isDemoMode } from "@/lib/data-service";
 
 export async function GET() {
   try {
-    const products = await prisma.product.findMany({
-      include: {
-        category: { select: { name: true } },
-        images: { select: { url: true } },
-        variants: { select: { stock: true } },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    const formatted = products.map((p) => {
-      const totalStock = p.variants.reduce((sum, v) => sum + v.stock, 0);
-      let status = "Active";
-      if (totalStock === 0) status = "Out of Stock";
-      else if (totalStock < 10) status = "Low Stock";
-
-      return {
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        category: p.category.name,
-        price: p.basePrice,
-        stock: totalStock,
-        status,
-        image: p.images[0]?.url || "",
-      };
-    });
-
+    const formatted = await getAdminProducts();
     return NextResponse.json(formatted);
   } catch (error: any) {
     console.error("Error fetching products:", error);
@@ -43,6 +16,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (isDemoMode()) {
+    return NextResponse.json(
+      { error: "Demo Mode: Write operations are disabled. Connect a real database to enable this feature." },
+      { status: 403 }
+    );
+  }
   try {
     const body = await request.json();
     const {
@@ -127,6 +106,12 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (isDemoMode()) {
+    return NextResponse.json(
+      { error: "Demo Mode: Write operations are disabled. Connect a real database to enable this feature." },
+      { status: 403 }
+    );
+  }
   try {
     const { id } = await request.json();
     if (!id) {
@@ -148,6 +133,12 @@ export async function DELETE(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  if (isDemoMode()) {
+    return NextResponse.json(
+      { error: "Demo Mode: Write operations are disabled. Connect a real database to enable this feature." },
+      { status: 403 }
+    );
+  }
   try {
     const body = await request.json();
     const {

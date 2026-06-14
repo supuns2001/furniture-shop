@@ -1,45 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAdminOrders, isDemoMode } from "@/lib/data-service";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const orders = await prisma.order.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        shippingAddress: true,
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                name: true,
-                images: {
-                  take: 1,
-                  select: { url: true },
-                },
-              },
-            },
-          },
-        },
-        instalmentPlan: {
-          select: {
-            id: true,
-            status: true,
-            paidAmount: true,
-            totalAmount: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
+    const orders = await getAdminOrders();
     return NextResponse.json(orders);
   } catch (error: any) {
     console.error("GET /api/admin/orders error:", error);
@@ -51,6 +18,12 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
+  if (isDemoMode()) {
+    return NextResponse.json(
+      { error: "Demo Mode: Write operations are disabled. Connect a real database to enable this feature." },
+      { status: 403 }
+    );
+  }
   try {
     const body = await req.json();
     const { orderId, status } = body;

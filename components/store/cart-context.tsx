@@ -32,29 +32,22 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 const LOCAL_STORAGE_KEY = "lumen_cart";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const savedCart = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (savedCart) {
-          return JSON.parse(savedCart);
-        }
-      } catch (e) {
-        console.error("Failed to parse cart from localStorage in initializer:", e);
-      }
-    }
-    return [];
-  });
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   // userId will be populated when auth is integrated (e.g. from useSession)
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsInitialized(true);
-    }, 0);
-    return () => clearTimeout(timer);
+    try {
+      const savedCart = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedCart) {
+        setCartItems(JSON.parse(savedCart));
+      }
+    } catch (e) {
+      console.error("Failed to parse cart from localStorage on mount:", e);
+    }
+    setIsInitialized(true);
   }, []);
 
   // ─── Persist to localStorage whenever cart changes ──────────────────────

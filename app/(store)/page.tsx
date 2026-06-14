@@ -2,22 +2,10 @@ import { Hero } from "@/components/store/hero";
 import { FeaturedCollections } from "@/components/store/featured-collections";
 import { NewArrivals } from "@/components/store/new-arrivals";
 import { BrandStory } from "@/components/store/brand-story";
-import { prisma } from "@/lib/prisma";
+import { getLatestProducts } from "@/lib/data-service";
 
 export default async function Home() {
-  const latestProducts = await prisma.product.findMany({
-    take: 4,
-    orderBy: {
-      createdAt: "desc",
-    },
-    include: {
-      images: {
-        select: {
-          url: true,
-        },
-      },
-    },
-  });
+  const latestProducts = await getLatestProducts(4);
 
   return (
     <div className="flex flex-col w-full">

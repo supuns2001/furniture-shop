@@ -1,5 +1,5 @@
 import { ProductListing } from "@/components/store/product-listing";
-import { prisma } from "@/lib/prisma";
+import { getStoreProducts } from "@/lib/data-service";
 
 export const metadata = {
   title: "All Products | Lumen Furniture",
@@ -7,27 +7,12 @@ export const metadata = {
 };
 
 export default async function ProductsPage() {
-  const products = await prisma.product.findMany({
-    include: {
-      category: {
-        select: {
-          name: true,
-        },
-      },
-      images: {
-        select: {
-          url: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const products = await getStoreProducts();
 
   return (
     <div className="bg-background min-h-screen">
-      <ProductListing initialProducts={products} />
+      <ProductListing initialProducts={products as any} />
     </div>
   );
 }
+
