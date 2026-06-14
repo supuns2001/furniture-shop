@@ -51,7 +51,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
     subCategoryId: product.subCategoryId || "",
     brandId: product.brandId || "",
     isEmiEligible: product.isEmiEligible,
-    images: product.images.map((img) => img.url),
+    images: product.images.map((img: { url: string }) => img.url),
     variants: product.variants.map((v) => ({
       color: v.color || "",
       material: v.material || "",
