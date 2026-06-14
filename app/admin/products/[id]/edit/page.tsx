@@ -52,7 +52,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
     brandId: product.brandId || "",
     isEmiEligible: product.isEmiEligible,
     images: product.images.map((img: { url: string }) => img.url),
-    variants: product.variants.map((v) => ({
+    variants: product.variants.map((v: { color: string | null; material: string | null; stock: number; priceOffset: number }) => ({
       color: v.color || "",
       material: v.material || "",
       stock: v.stock,
