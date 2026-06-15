@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { EditProductForm } from "@/components/admin/edit-product-form";
+import { isDemoMode } from "@/lib/data-service";
+import { demoBrands, demoCategories, demoProducts, demoSubcategories } from "@/lib/demo-data";
 
 export const metadata = {
   title: "Edit Product | Admin | Lumen",
@@ -15,31 +17,43 @@ interface EditProductPageProps {
 export default async function EditProductPage({ params }: EditProductPageProps) {
   const { id } = await params;
 
-  // Retrieve product from database along with relations
-  const product = await prisma.product.findUnique({
-    where: { id },
-    include: {
-      images: true,
-      variants: true,
-    },
-  });
+  let product;
+  let categories;
+  let subCategories;
+  let brands;
+
+  if (isDemoMode()) {
+    product = demoProducts.find((p) => p.id === id);
+    categories = demoCategories;
+    subCategories = demoSubcategories;
+    brands = demoBrands;
+  } else {
+    // Retrieve product from database along with relations
+    product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        images: true,
+        variants: true,
+      },
+    });
+
+    // Retrieve all taxonomy lists
+    categories = await prisma.category.findMany({
+      orderBy: { name: "asc" },
+    });
+
+    subCategories = await prisma.subCategory.findMany({
+      orderBy: { name: "asc" },
+    });
+
+    brands = await prisma.brand.findMany({
+      orderBy: { name: "asc" },
+    });
+  }
 
   if (!product) {
     notFound();
   }
-
-  // Retrieve all taxonomy lists
-  const categories = await prisma.category.findMany({
-    orderBy: { name: "asc" },
-  });
-
-  const subCategories = await prisma.subCategory.findMany({
-    orderBy: { name: "asc" },
-  });
-
-  const brands = await prisma.brand.findMany({
-    orderBy: { name: "asc" },
-  });
 
   // Map to simple JSON serializable props for the client component
   const formattedProduct = {

@@ -1,12 +1,20 @@
 import { ProductDetail } from "@/components/store/product-detail";
 import { prisma } from "@/lib/prisma";
+import { isDemoMode } from "@/lib/data-service";
+import { demoProducts } from "@/lib/demo-data";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const product = await prisma.product.findUnique({
-    where: { slug },
-    select: { name: true, description: true },
-  });
+  let product;
+
+  if (isDemoMode()) {
+    product = demoProducts.find((p) => p.slug === slug);
+  } else {
+    product = await prisma.product.findUnique({
+      where: { slug },
+      select: { name: true, description: true },
+    });
+  }
 
   return {
     title: product ? `${product.name} | Lumen Furniture` : "Product Not Found | Lumen Furniture",
@@ -16,31 +24,36 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  let product;
 
-  const product = await prisma.product.findUnique({
-    where: { slug },
-    include: {
-      category: {
-        select: {
-          name: true,
+  if (isDemoMode()) {
+    product = demoProducts.find((p) => p.slug === slug);
+  } else {
+    product = await prisma.product.findUnique({
+      where: { slug },
+      include: {
+        category: {
+          select: {
+            name: true,
+          },
+        },
+        images: {
+          select: {
+            url: true,
+          },
+        },
+        variants: {
+          select: {
+            id: true,
+            color: true,
+            material: true,
+            stock: true,
+            priceOffset: true,
+          },
         },
       },
-      images: {
-        select: {
-          url: true,
-        },
-      },
-      variants: {
-        select: {
-          id: true,
-          color: true,
-          material: true,
-          stock: true,
-          priceOffset: true,
-        },
-      },
-    },
-  });
+    });
+  }
 
   if (!product) {
     return (

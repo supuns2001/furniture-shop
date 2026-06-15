@@ -1,22 +1,34 @@
 import { prisma } from "@/lib/prisma";
 import { NewProductForm } from "@/components/admin/new-product-form";
+import { isDemoMode } from "@/lib/data-service";
+import { demoBrands, demoCategories, demoSubcategories } from "@/lib/demo-data";
 
 export const metadata = {
   title: "Add Product | Admin | Lumen",
 };
 
 export default async function AddProductPage() {
-  const categories = await prisma.category.findMany({
-    orderBy: { name: "asc" },
-  });
+  let categories;
+  let subCategories;
+  let brands;
 
-  const subCategories = await prisma.subCategory.findMany({
-    orderBy: { name: "asc" },
-  });
+  if (isDemoMode()) {
+    categories = demoCategories;
+    subCategories = demoSubcategories;
+    brands = demoBrands;
+  } else {
+    categories = await prisma.category.findMany({
+      orderBy: { name: "asc" },
+    });
 
-  const brands = await prisma.brand.findMany({
-    orderBy: { name: "asc" },
-  });
+    subCategories = await prisma.subCategory.findMany({
+      orderBy: { name: "asc" },
+    });
+
+    brands = await prisma.brand.findMany({
+      orderBy: { name: "asc" },
+    });
+  }
 
   return (
     <NewProductForm
