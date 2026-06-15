@@ -11,7 +11,7 @@ export function SettingsManagement() {
   const [settings, setSettings] = useState({
     storeName: "Lumen Furniture",
     supportEmail: "support@lumen.com",
-    currency: "USD",
+    currency: "LKR",
     emiRate: "0",
     notifyOrderConfirmations: true,
     notifyEmiReminders: true,
@@ -30,7 +30,7 @@ export function SettingsManagement() {
           setSettings({
             storeName: data.storeName || "Lumen Furniture",
             supportEmail: data.supportEmail || "support@lumen.com",
-            currency: data.currency || "USD",
+            currency: data.currency || "LKR",
             emiRate: data.emiRate || "0",
             notifyOrderConfirmations: data.notifyOrderConfirmations === "true",
             notifyEmiReminders: data.notifyEmiReminders === "true",

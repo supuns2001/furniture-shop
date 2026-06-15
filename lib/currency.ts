@@ -39,7 +39,7 @@ export const CURRENCIES: Record<string, CurrencyConfig> = {
   },
 };
 
-export const DEFAULT_CURRENCY = "USD";
+export const DEFAULT_CURRENCY = "LKR";
 
 /**
  * Formats a given price based on the currency code.

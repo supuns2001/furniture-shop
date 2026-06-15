@@ -11,7 +11,7 @@ export async function GET() {
     const publicSettings = {
       storeName: "Lumen Furniture",
       supportEmail: "support@lumen.com",
-      currency: "USD",
+      currency: "LKR",
       emiRate: 0,
     };
 

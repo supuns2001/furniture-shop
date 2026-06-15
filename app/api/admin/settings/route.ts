@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 const DEFAULT_SETTINGS: Record<string, string> = {
   storeName: "Lumen Furniture",
   supportEmail: "support@lumen.com",
-  currency: "USD",
+  currency: "LKR",
   emiRate: "0",
   notifyOrderConfirmations: "true",
   notifyEmiReminders: "true",
